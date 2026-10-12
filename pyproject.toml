@@ -3,36 +3,42 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "finance-agent"
-version = "0.5.0"
-description = "Privacy-first financial statement ingestion and classification pipeline"
+name = "finance-bot"
+version = "0.1.0"
+description = "Telegram finance assistant backed by an LLM with deterministic tools"
 readme = "README.md"
-requires-python = ">=3.11,<3.14"
+requires-python = ">=3.12,<3.14"
 license = { text = "MIT" }
 dependencies = [
-  "pydantic>=2.10,<3",
+  "aiohttp>=3.14,<4",  # async transport required by azure.identity.aio
+  "azure-identity>=1.26,<2",
+  "openai>=3.29,<4",
+  "pydantic-settings>=2.15,<3",
+  "python-telegram-bot>=22.8,<23",
+  "tzdata>=2026.1",  # Windows and slim containers ship no time zone database
 ]
 
 [project.scripts]
-finance-agent = "finance_agent.cli:main"
+finance-bot = "finance_bot.__main__:main"
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
-  "pytest>=8.3,<9",
-  "ruff>=0.9,<1",
-]
-pdf = [
-  "pdfplumber>=0.11,<1",
-  "reportlab>=4.2,<5",
+  "pytest>=9.1,<10",
+  "pytest-asyncio>=1.4,<2",
+  "ruff>=0.17,<1",
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/finance_agent"]
+packages = ["src/finance_bot"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+asyncio_mode = "auto"
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]

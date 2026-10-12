@@ -7,6 +7,6 @@ Descreva a alteracao e os casos de teste afetados.
 - [ ] Nao inclui extratos ou transacoes reais.
 - [ ] Nao inclui nome, conta, documento ou identificador pessoal.
 - [ ] Nao inclui `.env`, token, senha ou chave.
-- [ ] Novas fixtures foram criadas do zero e estao em `samples/synthetic/`.
-- [ ] Testes de seguranca e estrutura foram executados.
+- [ ] Novas fixtures foram criadas do zero e estao em `tests/fixtures/`.
+- [ ] `pytest` e `ruff check` foram executados.
 

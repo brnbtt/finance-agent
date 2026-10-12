@@ -1,143 +1,47 @@
-# Finance Agent
+# Finance Bot
 
-Pipeline financeiro extensivel para importar, normalizar, reconciliar e classificar transacoes de diferentes instituicoes. O projeto adota uma arquitetura local-first: dados financeiros reais permanecem fora do repositorio e da demonstracao publica.
+A personal finance assistant on Telegram. Users send bank exports (CSV) and ask questions in
+natural language; an LLM (GPT-6 Luna on Azure AI Foundry) answers.
 
-> Estado atual: Etapa 5 - classificação por regras prioritárias e correção humana.
+Status: onboarding, CSV uploads, and chat work; reading transactions and analysis come next. See
+[docs/next-steps.md](docs/next-steps.md).
 
-## Objetivos
-
-- Padronizar extratos de diferentes bancos em um schema canonico.
-- Detectar perdas, ambiguidades e duplicidades sem decisoes silenciosas.
-- Classificar transacoes por regras confirmadas antes de recorrer a IA.
-- Permitir execucao privada local e demonstracao em nuvem apenas com dados ficticios.
-- Manter portabilidade entre Azure e Google Cloud por meio de adaptadores.
-
-## Seguranca dos dados
-
-Este repositorio nao contem extratos, valores, nomes, contas ou identificadores reais. Os arquivos em `samples/synthetic/` foram criados do zero e existem apenas para reproduzir formatos e casos estruturais.
-
-Nunca adicione dados reais ao Git. Coloque-os em `private_data/`, que e bloqueado pelo `.gitignore`. Consulte [SECURITY.md](SECURITY.md) e [docs/data-privacy.md](docs/data-privacy.md).
-
-## Estrutura atual
+## Layout
 
 ```text
-finance-agent/
-|-- src/finance_agent/domain/
-|-- src/finance_agent/application/
-|-- src/finance_agent/ingestion/
-|-- src/finance_agent/persistence/
-|-- tests/domain/
-|-- tests/application/
-|-- samples/synthetic/
-|-- scripts/
-|-- docs/
-|-- .gitignore
-|-- pyproject.toml
-`-- README.md
+src/finance_bot/
+  __main__.py      # entry point: wiring + Telegram long polling
+  config.py        # settings from environment / .env
+  telegram_bot.py  # Telegram adapter: updates -> core events, replies -> messages
+  core.py          # channel-agnostic: onboarding, routing, uploads
+  agent.py         # model conversation: instructions + history
+  llm.py           # Azure AI Foundry client (Responses API)
+  db.py            # SQLite schema, migrations, queries
+tests/             # pytest with a fake model; fictional CSV fixtures
 ```
 
-## Fixtures sinteticas
+## Setup
 
-- `picpay_demo_jul_ago_2026.csv`: estrutura equivalente a um export CSV, com credito, debito, sinal Unicode e duplicidade intencional.
-- `bradesco_demo_jul_ago_2026.csv`: estrutura delimitada por ponto e virgula, com IDs variaveis, ID zero e historico contendo separador adicional.
-- `bradesco_demo_jul_ago_2026.pdf`: PDF textual ficticio, incluindo uma transacao monetaria que comeca por texto para testar segmentacao.
-
-Todos os nomes, valores, datas, documentos, contas e descricoes foram inventados.
-
-## Preparacao local
-
-Requer Python 3.11, 3.12 ou 3.13.
+Requires [uv](https://docs.astral.sh/uv/) and Python 3.12+.
 
 ```bash
-python -m venv .venv
-.venv\Scripts\activate
-python -m pip install -e ".[dev]"
-pytest
+uv sync
+cp .env.example .env   # then fill in the values
 ```
 
-## Etapa 3: ingestão local
+You need a bot token from [@BotFather](https://t.me/BotFather), invite codes of your choice, and
+an Azure AI Foundry resource with a `gpt-6-luna` deployment. Without an API key the bot uses
+Entra ID: run `az login` and give your user the `Cognitive Services OpenAI User` role.
 
-O comando abaixo detecta o formato, interpreta o CSV e exibe somente contagens e
-códigos de alerta. Nenhuma transação é persistida nesta etapa.
+## Run and test
 
 ```bash
-finance-agent ingest samples/synthetic/picpay_demo_jul_ago_2026.csv
-finance-agent ingest samples/synthetic/bradesco_demo_jul_ago_2026.csv
+uv run finance-bot     # then /start in Telegram, the invite code, and your name
+uv run pytest
+uv run ruff check .
 ```
 
-Um CSV desconhecido com colunas mínimas recebe uma sugestão, mas não é processado
-sem aprovação. Para aprovar e salvar apenas o mapeamento no registro privado:
+## Data
 
-```bash
-finance-agent ingest private_data/inbox/novo.csv \
-  --approve-format "Banco Exemplo" --currency BRL --date-order dmy
-```
-
-Importações posteriores com o mesmo schema reconhecem a configuração. Mudanças
-em colunas, delimitador, ordem ou largura das linhas geram alertas; ausência de
-uma coluna mínima bloqueia o processamento. Veja
-[docs/ingestion.md](docs/ingestion.md).
-
-## Etapa 4: persistência SQLite
-
-Inicialize o banco privado e importe uma fixture sintética:
-
-```bash
-finance-agent db init
-finance-agent ingest samples/synthetic/picpay_demo_jul_ago_2026.csv --persist
-finance-agent db summary
-```
-
-O terminal exibe somente contagens e códigos seguros. Reimportar o mesmo arquivo
-não duplica transações. Coincidências entre arquivos sem identificador bancário
-confiável ficam abertas para revisão, em vez de serem descartadas. O lote é
-atômico: uma falha reverte todas as linhas financeiras daquela importação.
-
-O banco padrão fica em `private_data/finance_agent.db`, fora do Git. Consulte
-[docs/persistence.md](docs/persistence.md).
-
-## Etapa 5: classificação por prioridade
-
-Crie categorias, execute o motor e consulte a fila de revisão:
-
-```bash
-finance-agent categories add "Alimentação"
-finance-agent classify run
-finance-agent classify pending
-finance-agent classify summary
-```
-
-As naturezas são `despesa`, `receita`, `transferencia_interna` e `estorno`.
-Somente a maior prioridade é considerada; empate com resultados diferentes vira
-revisão humana. Uma correção pode valer apenas para uma transação ou criar, com
-`--remember`, uma regra exata para lançamentos futuros. Decisões existentes não
-são reclassificadas silenciosamente. Consulte
-[docs/classification.md](docs/classification.md).
-
-## Etapa 2: contrato dos dados
-
-Um parser de qualquer banco deve produzir um `TransactionCandidate`. A camada de
-validação promove o candidato a `Transaction` somente quando existem:
-
-- data da transação;
-- valor não nulo, com sinal/direção sem ambiguidade;
-- descrição que identifique o destino ou a origem do dinheiro.
-
-Cartão, conta, método de pagamento, estabelecimento e contraparte são contextos
-opcionais. Eles são preservados quando existirem, mas nunca substituem a
-descrição. Dados insuficientes viram `PendingTransaction`, com códigos de erro
-explícitos, e podem ser corrigidos por `apply_correction`. O futuro canal de
-WhatsApp reutilizará essa operação sem carregar regras financeiras no chatbot.
-
-Consulte [docs/canonical-schema.md](docs/canonical-schema.md) e
-[docs/data-quality-rules.md](docs/data-quality-rules.md).
-
-## Limites desta etapa
-
-Ainda não foram implementados PDF, OCR, machine learning, API, agente ou integração
-com WhatsApp. Os parsers atuais cobrem PicPay CSV, Bradesco CSV e CSVs tabulares
-aprovados pela pessoa usuária.
-
-## Licenca
-
-MIT. Veja [LICENSE](LICENSE).
+Real data lives only in `data/` (ignored by Git). Never commit statements, databases, or `.env`.
+See [SECURITY.md](SECURITY.md).

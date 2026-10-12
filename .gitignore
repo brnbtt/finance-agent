@@ -1,7 +1,6 @@
 # Dados privados e extratos reais
+data/
 private_data/
-data/raw/
-data/private/
 notebooks/private/
 
 # Formatos financeiros bloqueados por padrao
@@ -17,8 +16,7 @@ notebooks/private/
 *.sqlite3
 
 # Somente fixtures sinteticas auditadas podem ser versionadas
-!samples/synthetic/*.csv
-!samples/synthetic/*.pdf
+!tests/fixtures/*.csv
 
 # Notebooks podem armazenar saidas e dados pessoais
 *.ipynb

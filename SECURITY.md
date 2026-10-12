@@ -10,15 +10,16 @@
 
 ## Processamento privado
 
-Dados reais devem permanecer em `private_data/` e ser processados localmente. Demonstracoes e testes em nuvem devem usar exclusivamente os arquivos de `samples/synthetic/`.
+Dados reais ficam em `data/` (ignorado pelo Git) localmente, ou no armazenamento
+privado do Azure em produção. Testes usam exclusivamente os arquivos fictícios de
+`tests/fixtures/`.
 
-O banco SQLite local nao possui criptografia propria. Proteja o dispositivo com
-senha e criptografia de disco, nao salve numeros completos de conta ou cartao e
-nunca force a inclusao de `private_data/` no Git.
+O banco SQLite nao possui criptografia propria. Proteja o dispositivo com senha e
+criptografia de disco e nunca force a inclusao de `data/` no Git.
 
-Regras de classificacao podem conter descricoes normalizadas de estabelecimentos
-ou destinatarios. Por isso, elas vivem somente no SQLite privado. Os comandos de
-resumo e listagem de regras nao exibem os criterios armazenados.
+Mensagens e extratos enviados ao bot passam pelo Telegram e pelo modelo no Azure AI
+Foundry. Os logs registram apenas IDs internos, tipos de evento e codigos de erro,
+nunca o conteudo de mensagens ou arquivos.
 
 ## Incidente
 
